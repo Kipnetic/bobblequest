@@ -31,7 +31,7 @@ env:
 
 jobs:
   verify:
-    name: verify
+    name: CI Gate
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
