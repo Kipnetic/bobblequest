@@ -13,8 +13,8 @@ maintainer_contract: any agent editing packages/db/** or apps/*/db wiring MUST u
 - **2026-04-27 — Project domain implemented and wired.** `ProjectRepository` port added;
   `DrizzleProjectRepositoryImpl` + `InMemoryProjectRepository` implemented; `projects` table +
   `projectStatusEnum` schema landed; `db:generate` run producing `0001_magenta_omega_red.sql`
-  migration; `UserRepository` updated with `list()` method; all ports registered in `registerDbDI`
-  and hoisted to `dependencyKeys.global`.
+  migration; all ports registered in `registerDbDI` and hoisted to `dependencyKeys.global`.
+  (`UserRepository.list()` was later removed: the `users` table has no tenant column to scope it.)
 - **2026-04-26 — integration tests pass against live Postgres + pgvector; `drizzle-kit generate` /
   `drizzle-kit migrate` workflow verified end-to-end.** `docker-compose.db.yml` remapped to
   `5433:5432` to avoid collision with native Windows Postgres on `:5432`.
