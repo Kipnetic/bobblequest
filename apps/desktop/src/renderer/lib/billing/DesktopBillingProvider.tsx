@@ -1,4 +1,4 @@
-import Purchases, { type CustomerInfo, type Offering } from '@revenuecat/purchases-js'
+import { type CustomerInfo, type Offering, Purchases } from '@revenuecat/purchases-js'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { desktopClientConfig } from '../clientConfig'
 
