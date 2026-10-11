@@ -27,6 +27,7 @@
     "format:check": "biome ci .",
     "clean": "turbo run clean && rimraf node_modules",
     "doctor": "bun run scripts/doctor.ts",
+    "audit:deps": "bun run scripts/ci/dependency-audit.ts",
     "stack:up": "docker compose up -d",
     "stack:down": "bun run scripts/stack/teardown-pids.ts",
     "stack:clean": "bun run stack:down && bun run scripts/stack/run-cleanup.ts volumes",

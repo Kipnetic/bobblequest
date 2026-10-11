@@ -295,9 +295,13 @@ jobs:
       # -----------------------------------------------------------------------
       # 8. Dependency audit
       # -----------------------------------------------------------------------
+      # Residual-advisory gate with time-boxed exceptions; see
+      # docs/security/dependency-audit-policy.md
       - name: Dependency audit
         id: audit
-        run: bun audit
+        run: |
+          bun test scripts/ci
+          bun run audit:deps
 
       - name: Record dependency audit
         if: always()
