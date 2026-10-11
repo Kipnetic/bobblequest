@@ -473,13 +473,18 @@ jobs:
       # -----------------------------------------------------------------------
       # 13. Test & coverage
       # -----------------------------------------------------------------------
+      # test:integration runs the api integration project and the db / cache
+      # live suites against the postgres-test and redis services below; with
+      # CI=true those suites fail (not skip) when a service is unreachable.
       - name: Test & coverage
         id: test
         run: |
           if [[ "${FORCE_FULL_CI}" == "true" ]]; then
             bunx turbo run test:coverage
+            bunx turbo run test:integration
           else
             bunx turbo run test:coverage ${{ steps.filter.outputs.filter }}
+            bunx turbo run test:integration ${{ steps.filter.outputs.filter }}
           fi
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5434/template_test

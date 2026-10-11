@@ -17,7 +17,14 @@ export async function isDbAvailable(): Promise<boolean> {
     await c`SELECT 1`
     await c.end({ timeout: 1 })
     return true
-  } catch {
+  } catch (error) {
+    // Locally the live suites skip without a database; in CI an unreachable
+    // database is a failure, never a silent skip.
+    if (process.env.CI === 'true') {
+      throw new Error('TEST_DATABASE_URL is unreachable in CI', {
+        cause: error,
+      })
+    }
     return false
   }
 }
