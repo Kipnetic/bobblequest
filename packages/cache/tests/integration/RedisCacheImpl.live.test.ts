@@ -125,8 +125,12 @@ describe.skipIf(!available)('RedisCacheImpl (live Redis)', () => {
         await b.close()
       }
 
-      // a must fully complete before b enters
-      expect(order.indexOf('a-end')).toBeLessThan(order.indexOf('b-start'))
+      // Either holder may win the race for the lock; what matters is that the
+      // two critical sections never interleave.
+      expect([
+        ['a-start', 'a-end', 'b-start', 'b-end'],
+        ['b-start', 'b-end', 'a-start', 'a-end'],
+      ]).toContainEqual(order)
     })
 
     it('throws CacheLockTimeoutError when lock cannot be acquired in time', async () => {
