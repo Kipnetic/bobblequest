@@ -1,15 +1,17 @@
 import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
+import { requireInternalUserId } from '../lib/auth/internalUser'
 import { protectedProcedure, router } from '../trpc'
 
 /**
- * Projects router.
+ * Projects router: CRUD over the session user's own projects.
  *
- * The `projects` domain model is not yet defined in `@t/db` — no Drizzle
- * schema, no `ProjectRepository` port. These procedures retain their public
- * shapes so typed clients remain stable, but each throws
- * `NOT_IMPLEMENTED` until the domain lands. Owner scoping uses `ctx.userId`
- * (Clerk session subject) once wired.
+ * `projects.owner_id` is a uuid foreign key to `users.id`, so every read,
+ * write and ownership check uses the INTERNAL user id resolved from the
+ * session's Clerk id (`requireInternalUserId`), never `ctx.userId` itself.
+ * A caller whose Clerk user has not been mirrored into `users` yet gets
+ * NOT_FOUND. Projects owned by someone else are reported as NOT_FOUND too,
+ * so their existence does not leak.
  */
 export const projectsRouter = router({
   list: protectedProcedure
@@ -20,14 +22,15 @@ export const projectsRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      return ctx.projectRepository.findByOwnerId(ctx.userId, input)
+      return ctx.projectRepository.findByOwnerId(await requireInternalUserId(ctx), input)
     }),
 
   getById: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      const ownerId = await requireInternalUserId(ctx)
       const project = await ctx.projectRepository.findById(input.id)
-      if (!project || project.ownerId !== ctx.userId) {
+      if (!project || project.ownerId !== ownerId) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Project not found',
@@ -46,7 +49,7 @@ export const projectsRouter = router({
     .mutation(async ({ ctx, input }) => {
       return ctx.projectRepository.create({
         ...input,
-        ownerId: ctx.userId,
+        ownerId: await requireInternalUserId(ctx),
       })
     }),
 
@@ -60,8 +63,9 @@ export const projectsRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const ownerId = await requireInternalUserId(ctx)
       const project = await ctx.projectRepository.findById(input.id)
-      if (!project || project.ownerId !== ctx.userId) {
+      if (!project || project.ownerId !== ownerId) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Project not found',
@@ -75,8 +79,9 @@ export const projectsRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
+      const ownerId = await requireInternalUserId(ctx)
       const project = await ctx.projectRepository.findById(input.id)
-      if (!project || project.ownerId !== ctx.userId) {
+      if (!project || project.ownerId !== ownerId) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Project not found',

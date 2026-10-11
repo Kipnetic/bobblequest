@@ -54,20 +54,24 @@ const createItemInput = z.object({
 Use `publicProcedure` for unauthenticated access or `protectedProcedure` for routes that require
 a valid Clerk session. Both are imported from `../trpc`.
 
+`ctx.userId` is the Clerk id (`user_xxx`). Owner columns reference the internal `users.id` uuid,
+so resolve it with `requireInternalUserId(ctx)` before storing or comparing an owner.
+
 ```ts
+import { requireInternalUserId } from '../lib/auth/internalUser'
 import { protectedProcedure, router } from '../trpc'
 
 export const itemsRouter = router({
   create: protectedProcedure
     .input(createItemInput)
     .mutation(async ({ ctx, input }) => {
-      return ctx.itemRepository.create({ ...input, ownerId: ctx.userId })
+      return ctx.itemRepository.create({ ...input, ownerId: await requireInternalUserId(ctx) })
     }),
 
   list: protectedProcedure
     .input(z.object({ limit: z.number().min(1).max(100).default(10) }))
     .query(async ({ ctx, input }) => {
-      return ctx.itemRepository.findByOwnerId(ctx.userId, input)
+      return ctx.itemRepository.findByOwnerId(await requireInternalUserId(ctx), input)
     }),
 })
 ```
@@ -175,4 +179,4 @@ the tRPC endpoint via your preferred client or `curl` against `http://localhost:
 
 ---
 
-_Last reviewed: 2026-04-28 — owner: TBD_
+Last reviewed: 2026-04-28 — owner: TBD

@@ -3,9 +3,9 @@
  *
  * Uses the full Hono app (buildTestApp) with in-memory repos + NoopAuthProvider.
  * Auth: any non-empty Bearer token resolves to { id: 'user_noop', … }.
- * For cross-tenant tests, projects owned by 'other-user' are seeded directly
- * into the InMemoryProjectRepository so the authenticated user ('user_noop')
- * cannot access them.
+ * `projects.owner_id` is the INTERNAL `users.id`, so each suite mirrors two
+ * users (the session's `user_noop` and another) and seeds projects by their
+ * internal ids; projects owned by the other user must stay unreachable.
  *
  * tRPC HTTP shape (this server, @hono/trpc-server):
  *   Query   → GET  /trpc/<procedure>?input=<URLEncoded {"json": <input>}>
@@ -16,7 +16,7 @@
  *   Error envelope: {"error":{"message":"...","data":{"code":"<TRPC_CODE>","httpStatus":N,...}}}
  */
 
-import type { InMemoryProjectRepository } from '@t/db'
+import type { InMemoryProjectRepository, InMemoryUserRepository } from '@t/db'
 import { dependencyKeys } from '@t/dependency-injection'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { buildTestApp, signedFetch } from './setup.ts'
@@ -74,10 +74,20 @@ async function trpcErrCode(res: Response): Promise<string | undefined> {
 }
 
 // ---------------------------------------------------------------------------
-// Fixture: authenticated user's id (matches NoopAuthProvider stub)
+// Fixture: internal ids of the session user (Clerk `user_noop`, the
+// NoopAuthProvider stub) and of another user, mirrored per test.
 // ---------------------------------------------------------------------------
-const AUTHED_USER_ID = 'user_noop'
-const OTHER_USER_ID = 'other-user-xyz'
+let AUTHED_USER_ID: string
+let OTHER_USER_ID: string
+
+async function seedUsers(testApp: ReturnType<typeof buildTestApp>): Promise<void> {
+  const users = testApp.container.resolve<InMemoryUserRepository>(
+    dependencyKeys.global.USER_REPOSITORY,
+  )
+  users.clear()
+  AUTHED_USER_ID = (await users.create({ clerkUserId: 'user_noop', email: 'noop@example.com' })).id
+  OTHER_USER_ID = (await users.create({ clerkUserId: 'user_other', email: 'other@example.com' })).id
+}
 
 // ---------------------------------------------------------------------------
 // Suite
@@ -87,12 +97,13 @@ describe('projects.list', () => {
   let testApp: ReturnType<typeof buildTestApp>
   let projectRepo: InMemoryProjectRepository
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testApp = buildTestApp()
     projectRepo = testApp.container.resolve<InMemoryProjectRepository>(
       dependencyKeys.global.PROJECT_REPOSITORY,
     )
     projectRepo.clear()
+    await seedUsers(testApp)
   })
 
   it('returns empty array when authenticated user has no projects', async () => {
@@ -119,12 +130,13 @@ describe('projects.create', () => {
   let testApp: ReturnType<typeof buildTestApp>
   let projectRepo: InMemoryProjectRepository
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testApp = buildTestApp()
     projectRepo = testApp.container.resolve<InMemoryProjectRepository>(
       dependencyKeys.global.PROJECT_REPOSITORY,
     )
     projectRepo.clear()
+    await seedUsers(testApp)
   })
 
   it('creates a project and returns 200 with the created entity', async () => {
@@ -152,12 +164,13 @@ describe('projects.update', () => {
   let testApp: ReturnType<typeof buildTestApp>
   let projectRepo: InMemoryProjectRepository
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testApp = buildTestApp()
     projectRepo = testApp.container.resolve<InMemoryProjectRepository>(
       dependencyKeys.global.PROJECT_REPOSITORY,
     )
     projectRepo.clear()
+    await seedUsers(testApp)
   })
 
   it('updates an owned project and returns 200 with updated shape', async () => {
@@ -189,12 +202,13 @@ describe('projects.delete', () => {
   let testApp: ReturnType<typeof buildTestApp>
   let projectRepo: InMemoryProjectRepository
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testApp = buildTestApp()
     projectRepo = testApp.container.resolve<InMemoryProjectRepository>(
       dependencyKeys.global.PROJECT_REPOSITORY,
     )
     projectRepo.clear()
+    await seedUsers(testApp)
   })
 
   it('deletes an owned project; subsequent getById returns NOT_FOUND', async () => {
@@ -221,12 +235,13 @@ describe('projects.getById — 404 vs NOT_FOUND disambiguation', () => {
   let testApp: ReturnType<typeof buildTestApp>
   let projectRepo: InMemoryProjectRepository
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testApp = buildTestApp()
     projectRepo = testApp.container.resolve<InMemoryProjectRepository>(
       dependencyKeys.global.PROJECT_REPOSITORY,
     )
     projectRepo.clear()
+    await seedUsers(testApp)
   })
 
   it('returns NOT_FOUND for a genuinely nonexistent UUID', async () => {
@@ -254,12 +269,13 @@ describe('projects.create — input validation', () => {
   let testApp: ReturnType<typeof buildTestApp>
   let projectRepo: InMemoryProjectRepository
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testApp = buildTestApp()
     projectRepo = testApp.container.resolve<InMemoryProjectRepository>(
       dependencyKeys.global.PROJECT_REPOSITORY,
     )
     projectRepo.clear()
+    await seedUsers(testApp)
   })
 
   it('rejects missing required name with BAD_REQUEST', async () => {
