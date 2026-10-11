@@ -520,6 +520,8 @@ jobs:
           fi
         env:
           SITE_URL: http://localhost:3002
+          # No PostHog key in CI; analytics must be disabled explicitly.
+          POSTHOG_ENABLED: 'false'
 
       - name: Record build
         if: always()
