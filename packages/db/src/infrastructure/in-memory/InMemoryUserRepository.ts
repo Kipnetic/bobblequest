@@ -71,11 +71,6 @@ export class InMemoryUserRepository extends UserRepository {
     this.store.delete(id)
   }
 
-  async list(pagination: { limit: number; offset: number }): Promise<User[]> {
-    const all = Array.from(this.store.values())
-    return all.slice(pagination.offset, pagination.offset + pagination.limit)
-  }
-
   /** Test helper: empty the store between cases. */
   clear(): void {
     this.store.clear()

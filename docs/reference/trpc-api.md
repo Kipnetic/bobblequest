@@ -55,7 +55,7 @@ any router procedure.
 | Auth | public |
 | Input | none |
 | Output | `ctx.user` (Clerk session projection: `{ id, role, email }`) or `null` |
-| File | `apps/api/src/routers/auth.ts:21` |
+| File | `apps/api/src/routers/auth.ts:17` |
 
 Returns the Clerk session projection for the current request, or `null` for unauthenticated
 requests.
@@ -70,23 +70,11 @@ requests.
 | Auth | protected |
 | Input | `{ displayName?: string (min 1, max 255) }` |
 | Output | Updated user record from `UserRepository.update` |
-| File | `apps/api/src/routers/auth.ts:31` |
+| File | `apps/api/src/routers/auth.ts:22` |
 
-Updates the current user's profile metadata via `ctx.userRepository.update(ctx.userId, input)`.
-
----
-
-### `users.list`
-
-| Field | Value |
-| --- | --- |
-| Type | query |
-| Auth | public |
-| Input | `{ limit: number (1–100, default 10), offset: number (min 0, default 0) }` |
-| Output | `{ users: User[], limit: number, offset: number }` |
-| File | `apps/api/src/routers/users.ts:14` |
-
-Returns a paginated list of users from `ctx.userRepository.list(input)`.
+Updates the current user's profile metadata. Resolves the internal `users.id` from the Clerk id
+with `requireInternalUserId` (NOT_FOUND until the Clerk webhook has mirrored the user), then
+calls `ctx.userRepository.update`.
 
 ---
 
@@ -98,7 +86,7 @@ Returns a paginated list of users from `ctx.userRepository.list(input)`.
 | Auth | protected |
 | Input | none |
 | Output | `ctx.user` (Clerk session projection, non-null) |
-| File | `apps/api/src/routers/users.ts:30` |
+| File | `apps/api/src/routers/users.ts:12` |
 
 Returns the authenticated user's session projection.
 
@@ -112,9 +100,10 @@ Returns the authenticated user's session projection.
 | Auth | protected |
 | Input | `{ displayName: string (min 1, max 255) }` |
 | Output | Updated user record from `UserRepository.update` |
-| File | `apps/api/src/routers/users.ts:34` |
+| File | `apps/api/src/routers/users.ts:16` |
 
-Updates the current user's `displayName` via `ctx.userRepository.update(ctx.userId, input)`.
+Updates the current user's `displayName`. Resolves the internal `users.id` with
+`requireInternalUserId` (as `auth.updateProfile` does), then calls `ctx.userRepository.update`.
 
 ---
 

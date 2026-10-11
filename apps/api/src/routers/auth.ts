@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { requireInternalUserId } from '../lib/auth/internalUser'
 import { protectedProcedure, publicProcedure, router } from '../trpc'
 
 /**
@@ -7,11 +8,6 @@ import { protectedProcedure, publicProcedure, router } from '../trpc'
  * Identity (tokens, sessions, password lifecycle) is owned by Clerk — this
  * router only exposes views over `ctx.user` (Clerk session projection) and
  * mirrors profile edits down to the app-side `users` table.
- *
- * DB writes will route through `UserRepository` (resolved from the DI
- * container) once `registerDbDI` is wired into the composition root; until
- * then, `updateProfile` echoes the input back so the surface stays stable
- * for the web / mobile / desktop clients.
  */
 export const authRouter = router({
   /**
@@ -22,12 +18,7 @@ export const authRouter = router({
     return ctx.user
   }),
 
-  /**
-   * Update the current user's profile metadata.
-   *
-   * TODO(wiring): persist via `UserRepository.update(ctx.userId, ...)` once
-   * the DI container is bootstrapped in `apps/api/src/index.ts`.
-   */
+  /** Update the current user's profile metadata. */
   updateProfile: protectedProcedure
     .input(
       z.object({
@@ -35,6 +26,7 @@ export const authRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      return ctx.userRepository.update(ctx.userId, input)
+      // `ctx.userId` is the Clerk id; `update` keys on the internal uuid.
+      return ctx.userRepository.update(await requireInternalUserId(ctx), input)
     }),
 })

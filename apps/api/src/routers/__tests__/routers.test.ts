@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Context, SessionUser } from '../../trpc/context'
 import { appRouter } from '../index'
 
+const internalUserId = '11111111-1111-4111-8111-111111111111'
+
 function makeContext(overrides: Partial<Context> = {}): Context {
   return {
     userId: null,
@@ -9,8 +11,10 @@ function makeContext(overrides: Partial<Context> = {}): Context {
     req: new Request('http://localhost/trpc'),
     db: null,
     userRepository: {
+      findByClerkUserId: vi
+        .fn()
+        .mockImplementation((clerkUserId) => Promise.resolve({ id: internalUserId, clerkUserId })),
       update: vi.fn().mockImplementation((id, data) => Promise.resolve({ userId: id, ...data })),
-      list: vi.fn().mockResolvedValue([]),
     } as unknown as Context['userRepository'],
     projectRepository: {
       findByOwnerId: vi.fn().mockResolvedValue([]),
@@ -49,36 +53,18 @@ describe('auth router', () => {
     const ctx = makeContext({ userId: mockUser.id, user: mockUser })
     const caller = appRouter.createCaller(ctx)
     await caller.auth.updateProfile({ displayName: 'Alice' })
-    expect(ctx.userRepository.update).toHaveBeenCalledWith(mockUser.id, { displayName: 'Alice' })
+    expect(ctx.userRepository.findByClerkUserId).toHaveBeenCalledWith(mockUser.id)
+    expect(ctx.userRepository.update).toHaveBeenCalledWith(internalUserId, { displayName: 'Alice' })
   })
 })
 
 describe('users router', () => {
-  it('list returns results from userRepository.list', async () => {
-    const users = [
-      {
-        id: 'u1',
-        clerkUserId: 'clerk_u1',
-        email: 'u1@ex.com',
-        displayName: null,
-        avatarUrl: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]
-    const ctx = makeContext()
-    vi.mocked(ctx.userRepository.list).mockResolvedValue(users)
-    const caller = appRouter.createCaller(ctx)
-    const result = await caller.users.list({ limit: 5 })
-    expect(ctx.userRepository.list).toHaveBeenCalledWith({ limit: 5, offset: 0 })
-    expect(result.users).toEqual(users)
-  })
-
   it('update calls userRepository.update', async () => {
     const ctx = makeContext({ userId: mockUser.id, user: mockUser })
     const caller = appRouter.createCaller(ctx)
     await caller.users.update({ displayName: 'Bob' })
-    expect(ctx.userRepository.update).toHaveBeenCalledWith(mockUser.id, { displayName: 'Bob' })
+    expect(ctx.userRepository.findByClerkUserId).toHaveBeenCalledWith(mockUser.id)
+    expect(ctx.userRepository.update).toHaveBeenCalledWith(internalUserId, { displayName: 'Bob' })
   })
 })
 
