@@ -59,6 +59,13 @@ describe('parseBunAuditJson', () => {
     expect(advisories.find((a) => a.packageName === 'braces')?.severity).toBe('high')
   })
 
+  test('keeps an advisory without an id so it cannot be dropped silently', () => {
+    const advisories = parseBunAuditJson({ left: [{ title: 'no id', severity: 'high' }, 'junk'] })
+    expect(advisories.map((a) => a.id)).toEqual(['UNIDENTIFIED', 'UNIDENTIFIED'])
+    const gate = evaluateAuditGate(advisories, writeExceptions([]), now)
+    expect(gate.ok).toBe(false)
+  })
+
   test('an empty report is clean', () => {
     expect(parseBunAuditJson({})).toEqual([])
   })

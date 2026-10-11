@@ -56,7 +56,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** Parse the `bun audit --json` map: { [packageName]: Advisory[] }. */
+/**
+ * Parse the `bun audit --json` map: { [packageName]: Advisory[] }.
+ *
+ * An entry with no usable id is kept as `UNIDENTIFIED`, which no exception
+ * can match, so a malformed report fails the gate instead of dropping it.
+ */
 export function parseBunAuditJson(raw: unknown): AuditAdvisory[] {
   if (!isRecord(raw)) return []
 
@@ -64,14 +69,22 @@ export function parseBunAuditJson(raw: unknown): AuditAdvisory[] {
   for (const [packageName, value] of Object.entries(raw)) {
     if (!Array.isArray(value)) continue
     for (const item of value) {
-      if (!isRecord(item)) continue
+      if (!isRecord(item)) {
+        out.push({
+          id: 'UNIDENTIFIED',
+          packageName,
+          severity: 'unknown',
+          title: '(malformed)',
+          url: '',
+        })
+        continue
+      }
       const url = typeof item.url === 'string' ? item.url : ''
       const fromUrl = url.match(/GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}/i)?.[0]
       const cve = url.match(/CVE-\d{4}-\d+/i)?.[0]
       const fallback =
         typeof item.id === 'string' || typeof item.id === 'number' ? String(item.id) : ''
-      const id = fromUrl ?? cve ?? fallback
-      if (!id) continue
+      const id = fromUrl ?? cve ?? (fallback || 'UNIDENTIFIED')
       out.push({
         id,
         packageName,

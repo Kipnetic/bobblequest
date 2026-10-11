@@ -407,7 +407,7 @@ describe('clerk webhook handler — user.updated DI assertions', () => {
   })
 
   afterEach(() => {
-    process.env.CLERK_WEBHOOK_SECRET = undefined
+    Reflect.deleteProperty(process.env, 'CLERK_WEBHOOK_SECRET')
   })
 
   it('updates the mirrored row by its internal id', async () => {
