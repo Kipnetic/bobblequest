@@ -10,9 +10,13 @@ const mockPosthog = vi.hoisted(() => ({
   identify: vi.fn(),
   alias: vi.fn(),
   group: vi.fn(),
-  isFeatureEnabled: vi.fn(() => false),
+  // posthog-js returns undefined before flags have loaded
+  isFeatureEnabled: vi.fn((): boolean | undefined => false),
   featureFlags: {
-    getFlagVariants: vi.fn(() => ({ flag_a: true, flag_b: 'v2' })),
+    getFlagVariants: vi.fn((): Record<string, boolean | string> | undefined => ({
+      flag_a: true,
+      flag_b: 'v2',
+    })),
   },
   captureException: vi.fn(),
   register: vi.fn(),
@@ -491,6 +495,12 @@ describe('PostHogBrowserAnalyticsTracker', () => {
       expect(mockPosthog.isFeatureEnabled).toHaveBeenCalledWith('test-feature')
       expect(result).toBe(true)
     })
+
+    it('should return false while flags have not loaded (posthog returns undefined)', async () => {
+      mockPosthog.isFeatureEnabled.mockReturnValueOnce(undefined)
+      const result = await tracker.isFeatureEnabled('test-feature', 'test-user-id')
+      expect(result).toBe(false)
+    })
   })
 
   describe('getAllFlags', () => {
@@ -498,6 +508,12 @@ describe('PostHogBrowserAnalyticsTracker', () => {
       const result = await tracker.getAllFlags('test-user-id')
       expect(mockPosthog.featureFlags.getFlagVariants).toHaveBeenCalled()
       expect(result).toEqual({ flag_a: true, flag_b: 'v2' })
+    })
+
+    it('should return an empty map while flags have not loaded', async () => {
+      mockPosthog.featureFlags.getFlagVariants.mockReturnValueOnce(undefined)
+      const result = await tracker.getAllFlags('test-user-id')
+      expect(result).toEqual({})
     })
   })
 
