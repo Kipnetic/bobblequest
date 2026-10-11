@@ -10,7 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock svix before importing the clerk module.
 // Must use a regular function (not arrow function) because `new Webhook(...)` is called as a constructor.
-vi.mock('svix', () => ({
+vi.mock('svix', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('svix')>()),
   // biome-ignore lint/complexity/useArrowFunction: constructor mock — arrow functions cannot be used with `new`
   Webhook: vi.fn().mockImplementation(function () {
     return {
@@ -381,6 +382,53 @@ describe('clerk webhook handler — user.deleted DI assertions', () => {
     expect(res.status).toBe(200)
     expect(stubs.userRepository.delete).not.toHaveBeenCalled()
     // auth sync still called even when user not in our DB
+    expect(stubs.auth.syncFromWebhook).toHaveBeenCalledOnce()
+  })
+})
+
+describe('clerk webhook handler — user.updated DI assertions', () => {
+  let stubs: ReturnType<typeof makeStubs>
+  let app: ReturnType<typeof createClerkWebhookApp>
+  const payload = {
+    type: 'user.updated',
+    data: {
+      id: 'user_abc',
+      first_name: 'Ada',
+      last_name: 'Lovelace',
+      primary_email_address_id: 'email_1',
+      email_addresses: [{ id: 'email_1', email_address: 'ada@example.com' }],
+    },
+  }
+
+  beforeEach(() => {
+    process.env.CLERK_WEBHOOK_SECRET = 'whsec_test'
+    stubs = makeStubs()
+    app = createClerkWebhookApp(stubs.container)
+  })
+
+  afterEach(() => {
+    process.env.CLERK_WEBHOOK_SECRET = undefined
+  })
+
+  it('updates the mirrored row by its internal id', async () => {
+    stubs.userRepository.findByClerkUserId.mockResolvedValue({
+      id: 'internal_abc',
+      clerkUserId: 'user_abc',
+    })
+    const res = await callWebhook(app, payload)
+    expect(res.status).toBe(200)
+    expect(stubs.userRepository.update).toHaveBeenCalledWith('internal_abc', {
+      email: 'ada@example.com',
+      displayName: 'Ada Lovelace',
+      avatarUrl: null,
+    })
+  })
+
+  it('skips the update when the user was never mirrored, but still syncs auth', async () => {
+    stubs.userRepository.findByClerkUserId.mockResolvedValue(null)
+    const res = await callWebhook(app, payload)
+    expect(res.status).toBe(200)
+    expect(stubs.userRepository.update).not.toHaveBeenCalled()
     expect(stubs.auth.syncFromWebhook).toHaveBeenCalledOnce()
   })
 })

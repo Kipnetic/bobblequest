@@ -2,9 +2,6 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    // Exclude integration tests from the unit run; they are opt-in via
-    // `bun run test:integration` (--project integration).
-    include: ['src/**/*.test.ts', '!src/__tests__/integration/**/*.test.ts'],
     environment: 'node',
     globals: false,
     clearMocks: true,
@@ -27,16 +24,28 @@ export default defineConfig({
         lines: 100,
       },
     },
+    // Each project spells out its own `include`; the root declares none.
+    //
+    // Never narrow a suite with a `!`-negated glob in `test.include`: Vitest
+    // appends `test.include` to `coverage.exclude`, where a negated pattern
+    // excludes every source file (coverage reports 0/0 and the 100% threshold
+    // passes vacuously), and `extends: true` copies it into each project's
+    // include, cancelling the project's own pattern. Narrow with `exclude`.
     projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['src/**/*.test.ts'],
+          exclude: ['**/node_modules/**', 'src/__tests__/integration/**'],
+        },
+      },
       {
         extends: true,
         test: {
           name: 'integration',
           include: ['src/__tests__/integration/**/*.test.ts'],
-          setupFiles: ['src/__tests__/setup.ts'],
-          environment: 'node',
-          globals: false,
-          clearMocks: true,
+          exclude: ['**/node_modules/**'],
         },
       },
     ],
