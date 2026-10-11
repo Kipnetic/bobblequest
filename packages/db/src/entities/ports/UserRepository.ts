@@ -46,6 +46,6 @@ export abstract class UserRepository {
    */
   abstract delete(id: string): Promise<void>
 
-  /** List all users with pagination. */
-  abstract list(pagination: { limit: number; offset: number }): Promise<User[]>
+  // No `list`: the table has no tenant column, so any listing would expose
+  // every user's email.
 }

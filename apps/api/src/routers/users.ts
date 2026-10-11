@@ -1,32 +1,14 @@
 import { z } from 'zod'
-import { protectedProcedure, publicProcedure, router } from '../trpc'
+import { requireInternalUserId } from '../lib/auth/internalUser'
+import { protectedProcedure, router } from '../trpc'
 
 /**
- * Users router.
+ * Users router: views and edits over the session user's own row only.
  *
- * Reads / writes against the app-side `users` table will flow through
- * `UserRepository` (resolved from the DI container) once `registerDbDI` is
- * wired into `apps/api/src/index.ts`. The procedures below keep their public
- * shape so typed clients (`apps/web`, `apps/mobile`, `apps/desktop`) continue
- * to compile during the migration; they return session-derived data today.
+ * There is deliberately no `list`: the `users` table carries no tenant
+ * column, so any listing here would expose every user's email.
  */
 export const usersRouter = router({
-  list: publicProcedure
-    .input(
-      z.object({
-        limit: z.number().min(1).max(100).default(10),
-        offset: z.number().min(0).default(0),
-      }),
-    )
-    .query(async ({ ctx, input }) => {
-      const users = await ctx.userRepository.list(input)
-      return {
-        users,
-        limit: input.limit,
-        offset: input.offset,
-      }
-    }),
-
   me: protectedProcedure.query(({ ctx }) => {
     return ctx.user
   }),
@@ -38,6 +20,7 @@ export const usersRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      return ctx.userRepository.update(ctx.userId, input)
+      // `ctx.userId` is the Clerk id; `update` keys on the internal uuid.
+      return ctx.userRepository.update(await requireInternalUserId(ctx), input)
     }),
 })

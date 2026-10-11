@@ -44,6 +44,13 @@ describe('InMemoryUserRepository', () => {
     expect(await repo.findByEmail('find.me@example.com')).toEqual(created)
   })
 
+  it('skips non-matching rows when several users are stored', async () => {
+    await repo.create({ clerkUserId: 'user_first', email: 'first@example.com' })
+    const second = await repo.create({ clerkUserId: 'user_second', email: 'second@example.com' })
+    expect((await repo.findByClerkUserId('user_second'))?.id).toBe(second.id)
+    expect((await repo.findByEmail('SECOND@example.com'))?.id).toBe(second.id)
+  })
+
   it('rejects duplicate clerkUserId on create', async () => {
     await repo.create({ clerkUserId: 'user_dup', email: 'a@example.com' })
     await expect(repo.create({ clerkUserId: 'user_dup', email: 'b@example.com' })).rejects.toThrow(
@@ -120,17 +127,6 @@ describe('InMemoryUserRepository', () => {
     const updated = await repo.update(created.id, { displayName: 'Changed' })
     expect(updated.email).toBe('noemail@example.com')
     expect(updated.displayName).toBe('Changed')
-  })
-
-  it('list returns paginated users', async () => {
-    await repo.create({ clerkUserId: 'user_list1', email: 'list1@example.com' })
-    await repo.create({ clerkUserId: 'user_list2', email: 'list2@example.com' })
-    await repo.create({ clerkUserId: 'user_list3', email: 'list3@example.com' })
-    const page1 = await repo.list({ limit: 2, offset: 0 })
-    expect(page1).toHaveLength(2)
-    const page2 = await repo.list({ limit: 2, offset: 2 })
-    expect(page2).toHaveLength(1)
-    expect(page2[0].email).toBe('list3@example.com')
   })
 
   it('create exercises crypto fallback when randomUUID is unavailable', async () => {

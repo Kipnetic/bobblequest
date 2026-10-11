@@ -78,16 +78,6 @@ export class DrizzleUserRepositoryImpl extends UserRepository {
   async delete(id: string): Promise<void> {
     await this.client.getDrizzle().delete(users).where(eq(users.id, id))
   }
-
-  async list(pagination: { limit: number; offset: number }): Promise<User[]> {
-    const rows = await this.client
-      .getDrizzle()
-      .select()
-      .from(users)
-      .limit(pagination.limit)
-      .offset(pagination.offset)
-    return rows.map(toDomain)
-  }
 }
 
 function toDomain(row: UserRow): User {

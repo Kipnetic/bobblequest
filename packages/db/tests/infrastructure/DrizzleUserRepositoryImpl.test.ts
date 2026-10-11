@@ -28,16 +28,13 @@ function makeDrizzleMock(returnRows: unknown[]) {
     delete: vi.fn(),
   }
 
-  // select chain: .select().from().where().limit().offset()
-  // limit() is thenable so findById resolves without chaining .offset();
-  // .offset() is also supported so list() can chain it.
+  // select chain: .select().from().where().limit()
+  // limit() is thenable so the find* reads resolve on it.
   const selectChain = {
     from: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     limit: vi.fn().mockImplementation(() => {
-      const limitResult = {
-        offset: vi.fn().mockResolvedValue(returnRows),
-      }
+      const limitResult = {}
       Object.defineProperty(limitResult, 'then', {
         value: (resolve: (v: unknown[]) => unknown) => resolve(returnRows),
       })
@@ -178,15 +175,6 @@ describe('DrizzleUserRepositoryImpl', () => {
     })
     expect(user.displayName).toBe('New Name')
     expect(user.avatarUrl).toBe('https://example.com/a.png')
-  })
-
-  it('list returns paginated users', async () => {
-    const row = makeUserRow()
-    const { client } = makeClient([row])
-    const repo = new DrizzleUserRepositoryImpl(client)
-    const users = await repo.list({ limit: 5, offset: 0 })
-    expect(users).toHaveLength(1)
-    expect(users[0].id).toBe('u-1')
   })
 
   it('delete calls delete().where() without throwing', async () => {
