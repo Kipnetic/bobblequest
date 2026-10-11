@@ -10,6 +10,10 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**/*.ts'],
       exclude: [
+        // Vitest 4 matches coverage globs against absolute paths, so 'src/**'
+        // also picked up @t/analytics-types sources; those are covered by
+        // that package's own suite.
+        '**/packages/analytics-types/**',
         'src/**/*.test.ts',
         'src/**/index.ts',
         'src/entities/ports/AnalyticsTracker.ts',

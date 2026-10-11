@@ -164,7 +164,8 @@ export class OTLPWinstonTransport extends Transport {
       // can always complete its shutdown (and clear its internal interval timer)
       // within the 4 s shutdown guard, preventing timer leaks when the endpoint
       // is unreachable.
-      const processor = new BatchLogRecordProcessor(logExporter, {
+      const processor = new BatchLogRecordProcessor({
+        exporter: logExporter,
         maxQueueSize: config.maxQueueSize,
         maxExportBatchSize: config.batchSize,
         scheduledDelayMillis: config.exportIntervalMillis,

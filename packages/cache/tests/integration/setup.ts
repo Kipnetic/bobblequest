@@ -18,7 +18,12 @@ export async function isRedisAvailable(): Promise<boolean> {
     await client.connect()
     await client.ping()
     return true
-  } catch {
+  } catch (error) {
+    // Locally the live suite skips without Redis; in CI an unreachable Redis
+    // is a failure, never a silent skip.
+    if (process.env.CI === 'true') {
+      throw new Error('REDIS_URL is unreachable in CI', { cause: error })
+    }
     return false
   } finally {
     try {

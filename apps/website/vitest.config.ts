@@ -2,6 +2,11 @@ import { resolve } from 'node:path'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
+  // The Next.js tsconfig sets jsx: preserve; Vitest 4 (Vite 8) transforms with
+  // oxc, so the automatic runtime is configured here.
+  oxc: {
+    jsx: { runtime: 'automatic', importSource: 'react' },
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),

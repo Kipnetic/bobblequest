@@ -18,12 +18,12 @@ week-1 / week-2 ramp, see `ONBOARDING.md`.
 - **17 packages** in `packages/`: analytics (×4), auth, billing (×2), cache,
   config, db, dependency-injection, errors, logging (×4), queue. See
   `docs/packages/INDEX.md` for the full table with one-line purposes.
-- **Tooling**: Bun 1.3.11 (single package manager — no pnpm, no npm),
+- **Tooling**: Bun 1.4.2 (single package manager — no pnpm, no npm),
   Turbo 2.9.6 (monorepo task runner), Lefthook (git hooks: format-check,
   lint, typecheck, test, secret-scan on pre-commit; commitlint on
   commit-msg), Drizzle (Postgres ORM), Docker Compose for local
   Postgres (pgvector pg17, port 5433), Redis (port 6380).
-- **Engines**: Bun >= 1.3.11, Node >= 20.
+- **Engines**: Bun >= 1.4.2, Node >= 20.
 
 ## Five-minute first run
 

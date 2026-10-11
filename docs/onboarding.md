@@ -23,7 +23,7 @@ PR, plus tooling cheat sheets and a stack provider quick reference.
 | Requirement | Version | Install |
 | --- | --- | --- |
 | macOS / Linux / Windows (WSL 2) | — | — |
-| Bun | 1.3.11+ | `curl -fsSL https://bun.sh/install \| bash` |
+| Bun | 1.4.2+ | `curl -fsSL https://bun.sh/install \| bash` |
 | Docker Desktop | latest stable | <https://www.docker.com/products/docker-desktop> |
 | Node.js | 20+ | <https://nodejs.org> (tooling parity only; Bun is the runtime) |
 | Git | latest stable | pre-installed on most systems |

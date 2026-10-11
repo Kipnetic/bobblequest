@@ -1,7 +1,7 @@
 /**
  * Vitest mock for react-native-purchases.
  *
- * This file is resolved via vitest.config.mts alias so the native-only
+ * This file is resolved via the vitest.config.ts alias so the native-only
  * dependency can be imported in unit tests without a native runtime.
  */
 import { vi } from 'vitest'

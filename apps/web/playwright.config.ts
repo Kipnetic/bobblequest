@@ -31,6 +31,9 @@ export default defineConfig({
       NEXT_PUBLIC_TRPC_URL: process.env.NEXT_PUBLIC_TRPC_URL ?? 'http://localhost:3001/trpc',
       NEXT_PUBLIC_REVENUECAT_PUBLIC_API_KEY:
         process.env.NEXT_PUBLIC_REVENUECAT_PUBLIC_API_KEY ?? '',
+      // Without a PostHog key the composition root refuses to start unless
+      // analytics is disabled explicitly.
+      POSTHOG_ENABLED: process.env.POSTHOG_ENABLED ?? 'false',
     },
   },
 })

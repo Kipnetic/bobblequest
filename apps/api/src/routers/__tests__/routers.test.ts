@@ -75,7 +75,7 @@ describe('projects router', () => {
     const ctx = makeContext({ userId: mockUser.id, user: mockUser })
     const caller = appRouter.createCaller(ctx)
     await caller.projects.list({ limit: 10 })
-    expect(ctx.projectRepository.findByOwnerId).toHaveBeenCalledWith(mockUser.id, {
+    expect(ctx.projectRepository.findByOwnerId).toHaveBeenCalledWith(internalUserId, {
       limit: 10,
       offset: 0,
     })
@@ -84,7 +84,7 @@ describe('projects router', () => {
   it('getById returns project if owned by user', async () => {
     const project = {
       id: validId,
-      ownerId: mockUser.id,
+      ownerId: internalUserId,
       name: 'P1',
       description: null,
       status: 'active' as const,
@@ -122,7 +122,7 @@ describe('projects router', () => {
     await caller.projects.create({ name: 'New Proj' })
     expect(ctx.projectRepository.create).toHaveBeenCalledWith({
       name: 'New Proj',
-      ownerId: mockUser.id,
+      ownerId: internalUserId,
     })
   })
 
@@ -156,7 +156,7 @@ describe('projects router', () => {
   it('update calls projectRepository.update if owned', async () => {
     const project = {
       id: validId,
-      ownerId: mockUser.id,
+      ownerId: internalUserId,
       name: 'P1',
       description: null,
       status: 'active' as const,
@@ -200,7 +200,7 @@ describe('projects router', () => {
   it('delete calls projectRepository.delete if owned', async () => {
     const project = {
       id: validId,
-      ownerId: mockUser.id,
+      ownerId: internalUserId,
       name: 'P1',
       description: null,
       status: 'active' as const,

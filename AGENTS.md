@@ -8,7 +8,7 @@ changes.
 
 ## Issue tracker and triage labels
 
-Issues and PRDs for this repo live in GitHub Issues for `SolenixInc/bobblequest`. Use the `gh` CLI for issue operations.
+Issues and PRDs for this repo live in GitHub Issues for `Kipnetic/bobblequest`. Use the `gh` CLI for issue operations.
 
 Use the current four-label mapping: `needs-triage`, `needs-info`, `human-required`, and `wontfix`.
 

@@ -11,7 +11,7 @@
 
 ## Stack (KV)
 - Repo type: Bun + TypeScript monorepo, Bun workspaces + Turborepo
-- Package manager: `bun@1.3.11` (do not use npm/pnpm/yarn)
+- Package manager: `bun@1.4.2` (do not use npm/pnpm/yarn)
 - Build orchestrator: Turborepo `^2.0.0`
 - Formatter + linter: Biome `^1.9.0` (config extends `packages/config/biome.json`)
 - TypeScript: `^5.5.0` (base config: `tsconfig.base.json` → `packages/config/tsconfig/base.json`)

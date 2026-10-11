@@ -25,8 +25,10 @@ const mockInstance = {
 }
 const mockConfigure = vi.fn().mockReturnValue(mockInstance)
 
-vi.mock('@revenuecat/purchases-js', () => ({
-  default: { configure: mockConfigure },
+// The SDK has no default export; the provider uses the named Purchases class.
+vi.mock('@revenuecat/purchases-js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@revenuecat/purchases-js')>()),
+  Purchases: { configure: mockConfigure },
 }))
 
 // ─── Mock clientConfig ───────────────────────────────────────────────────────
@@ -41,7 +43,8 @@ const mockClientConfig = {
   environment: 'testing' as const,
 }
 
-vi.mock('../clientConfig', () => ({
+vi.mock('../../clientConfig', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../clientConfig')>()),
   desktopClientConfig: mockClientConfig,
 }))
 

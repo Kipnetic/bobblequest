@@ -81,7 +81,9 @@ export function buildContainer(): Container {
         const displayName = nameParts.length > 0 ? nameParts.join(' ') : null
         await repo.update(existing.id, { email, displayName, avatarUrl: d.image_url ?? null })
       }
+      /* v8 ignore start -- WebhookEventSchema is a discriminated union of exactly these three types and is parsed before this callback runs, so the implicit no-match arm is unreachable */
     } else if (event.type === 'user.deleted') {
+      /* v8 ignore stop */
       const existing = await repo.findByClerkUserId(event.data.id)
       if (existing) {
         await repo.delete(existing.id)
@@ -103,7 +105,6 @@ export function buildContainer(): Container {
       /* v8 ignore next — RevenueCatConfigSchema enforces webhookAuthHeader is a non-empty string; nullish branch is unreachable */
       revenuecatWebhookAuthHeader: config.revenueCat?.webhookAuthHeader ?? '',
     })
-    /* v8 ignore next 10 — config schema guards stripe/revenuecat vars at startup; this catch is a belt-and-suspenders safety net */
   } catch {
     logger.warning(
       {

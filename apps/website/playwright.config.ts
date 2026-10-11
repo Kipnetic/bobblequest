@@ -23,6 +23,9 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     env: {
       SITE_URL: 'http://localhost:3002',
+      // Without a PostHog key the composition root refuses to start unless
+      // analytics is disabled explicitly.
+      POSTHOG_ENABLED: process.env.POSTHOG_ENABLED ?? 'false',
     },
   },
 })
