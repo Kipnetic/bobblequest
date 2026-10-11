@@ -64,7 +64,8 @@ vi.mock('../trpc', () => ({
 }))
 
 vi.mock('@tanstack/react-query', () => ({
-  QueryClient: vi.fn(() => ({})),
+  // Vitest 4 mocks called with `new` need a constructable implementation.
+  QueryClient: vi.fn(class {}),
   QueryClientProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 

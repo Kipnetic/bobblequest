@@ -5,7 +5,10 @@ import { describe, expect, test, vi } from 'vitest'
 // with a lightweight spy that captures the JSX node passed to it.
 // ---------------------------------------------------------------------------
 vi.mock('next/og', () => ({
-  ImageResponse: vi.fn().mockImplementation((node: unknown) => ({ node })),
+  // Vitest 4 mocks called with `new` need a constructable implementation.
+  ImageResponse: vi.fn(function (this: { node: unknown }, node: unknown) {
+    this.node = node
+  }),
 }))
 
 import { ImageResponse } from 'next/og'
