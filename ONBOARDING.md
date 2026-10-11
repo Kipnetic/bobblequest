@@ -20,7 +20,7 @@ This repo is an **internal scaffold for new projects** at the organization. The 
 fill in the placeholders, and have a production-grade full-stack product ready to extend on day one.
 Everything in the repo is functional — not a skeleton.
 
-The tech stack is: **Bun 1.3.11** (runtime, package manager, bundler) + **Turborepo** (monorepo
+The tech stack is: **Bun 1.4.2** (runtime, package manager, bundler) + **Turborepo** (monorepo
 task pipeline) + **TypeScript** (strict mode everywhere) + **Clerk** (auth across all surfaces) +
 **RevenueCat** (primary billing layer for web, mobile, and desktop) over **Stripe** (web payment
 processor behind RevenueCat) + **PostHog** (analytics, feature flags, session replay, LLM

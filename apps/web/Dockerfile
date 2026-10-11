@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.11-alpine AS base
+FROM oven/bun:1.4.2-alpine AS base
 WORKDIR /app
 
 # Install all dependencies (including devDeps needed for next build)

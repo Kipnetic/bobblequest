@@ -15,7 +15,7 @@ paths:
    `git config --local --get core.hooksPath` — must be empty. If set, `git config --local --unset-all core.hooksPath`. See `lefthook-and-hooks.md`.
 
 2. **Bun version mismatch?**
-   `bun --version` must satisfy the `packageManager` field in root `package.json` (currently `bun@1.3.11`). Upgrade/downgrade Bun to match.
+   `bun --version` must satisfy the `packageManager` field in root `package.json` (currently `bun@1.4.2`). Upgrade/downgrade Bun to match.
 
 3. **Both lockfiles present?**
    If both `bun.lockb` and `bun.lock` exist, DELETE `bun.lockb`. Repo commits text `bun.lock` only.
