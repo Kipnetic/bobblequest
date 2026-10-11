@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Node-environment tests for registerAnalyticsBrowserDI.
  * Run with environment: 'node' so typeof window === 'undefined' is genuinely true.

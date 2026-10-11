@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Node-environment tests for PostHogBrowserAnalyticsTracker.
  * Run with environment: 'node' so typeof window === 'undefined' is true.

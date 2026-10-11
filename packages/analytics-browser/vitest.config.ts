@@ -16,8 +16,10 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     setupFiles: ['./tests/setup/stubLogging.ts'],
+    // *.node.test.ts files opt into the node environment with a
+    // `// @vitest-environment node` comment (environmentMatchGlobs was removed
+    // in Vitest 4).
     environment: 'jsdom',
-    environmentMatchGlobs: [['tests/**/*.node.test.ts', 'node']],
     globals: false,
     coverage: {
       provider: 'v8',
