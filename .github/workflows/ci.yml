@@ -92,10 +92,12 @@ jobs:
       # 2. Setup — Bun + caches (once for the entire job)
       # -----------------------------------------------------------------------
       - uses: ./.github/actions/setup-bun-monorepo
+        id: setup
         with:
           turbo-cache: 'true'
 
       - name: Install dependencies
+        id: install
         run: bun install --frozen-lockfile
 
       # -----------------------------------------------------------------------
@@ -846,3 +848,28 @@ jobs:
               });
               core.info(`Created CI Gate report on PR #${prNumber}`);
             }
+
+      # -----------------------------------------------------------------------
+      # Save caches (main only: a push to main, the weekly schedule or a manual
+      # dispatch on main).
+      #
+      # PRs restore and never save. A PR-saved cache lands under
+      # refs/pull/N/merge, which no other PR can read, and tarring the Bun
+      # cache cost apex-hub 490s per PR run. Caches saved from main are
+      # readable by every PR, so main is the only place a save pays for itself.
+      # always(): a red check later in the run does not make the downloaded
+      # packages or turbo's passed-task entries any less valid.
+      # -----------------------------------------------------------------------
+      - name: Save Bun install cache
+        if: always() && steps.install.outcome == 'success' && github.ref == 'refs/heads/main' && steps.setup.outputs.bun-cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.setup.outputs.bun-cache-key }}
+
+      - name: Save Turbo task cache
+        if: always() && steps.install.outcome == 'success' && github.ref == 'refs/heads/main' && steps.setup.outputs.turbo-cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .turbo
+          key: ${{ steps.setup.outputs.turbo-cache-key }}

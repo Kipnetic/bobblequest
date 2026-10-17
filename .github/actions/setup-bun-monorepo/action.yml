@@ -1,17 +1,37 @@
 name: Setup Bun Monorepo
 description: >
   Install Bun, restore Bun install cache, and optionally restore the Turbo task
-  cache. Consolidates the common setup steps used across every CI job into a
-  single composite action so the YAML workflow stays anchor-free (GitHub Actions
-  does not support YAML anchors). NOTE: actions/checkout must be run by each
-  consuming job BEFORE this composite, since local composite actions cannot be
-  loaded until the repo is checked out.
+  cache. Restore only: the consuming job saves. Consolidates the common setup
+  steps used across every CI job into a single composite action so the YAML
+  workflow stays anchor-free (GitHub Actions does not support YAML anchors).
+  NOTE: actions/checkout must be run by each consuming job BEFORE this
+  composite, since local composite actions cannot be loaded until the repo is
+  checked out.
 
 inputs:
   turbo-cache:
     description: 'Restore the .turbo task cache in addition to the Bun install cache.'
     required: false
     default: 'false'
+
+# Restore only. A composite action has no post step of its own, so saving is
+# the consuming job's job (see the "Save ... cache" steps at the end of
+# ci.yml), and it saves only from main. A PR-saved cache is scoped to
+# refs/pull/N/merge, which no other PR can read, and tarring the Bun cache in
+# the post step cost every PR run minutes (apex-hub PR 334: 490s).
+outputs:
+  bun-cache-key:
+    description: 'Exact key the Bun install cache is saved under.'
+    value: ${{ steps.bun-cache.outputs.cache-primary-key }}
+  bun-cache-hit:
+    description: "'true' when the Bun install cache matched the exact key."
+    value: ${{ steps.bun-cache.outputs.cache-hit }}
+  turbo-cache-key:
+    description: 'Exact key the Turbo task cache is saved under.'
+    value: ${{ steps.turbo-cache.outputs.cache-primary-key }}
+  turbo-cache-hit:
+    description: "'true' when the Turbo task cache matched the exact key."
+    value: ${{ steps.turbo-cache.outputs.cache-hit }}
 
 runs:
   using: composite
@@ -22,15 +42,17 @@ runs:
         bun-version: 1.4.2
 
     - name: Restore Bun install cache
-      uses: actions/cache@v4
+      id: bun-cache
+      uses: actions/cache/restore@v4
       with:
         path: ~/.bun/install/cache
         key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', '.github/workflows/ci.yml', 'turbo.json') }}
         restore-keys: bun-${{ runner.os }}-
 
     - name: Restore Turbo task cache
+      id: turbo-cache
       if: inputs.turbo-cache == 'true'
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: .turbo
         key: turbo-${{ runner.os }}-${{ hashFiles('bun.lock', '.github/workflows/ci.yml', 'turbo.json') }}
