@@ -1,8 +1,12 @@
 name: CI Gate
 
 on:
-  push:
-    branches: [main]
+  # Weekly full run on main instead of a run on every push: every commit on
+  # main already passed this gate on its PR, so post-merge reruns only spent
+  # the capped Actions budget. This run also saves the Bun and Turbo caches
+  # where every PR can restore them (a PR-saved cache is scoped to its ref).
+  schedule:
+    - cron: '17 9 * * 1'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -103,7 +107,7 @@ jobs:
       # -----------------------------------------------------------------------
       # 3. Compute base SHA for path scoping (PR diff vs merge base)
       #    On pull_request: base.sha is the merge-base of the PR's target branch.
-      #    On push to main: github.event.before is the pre-push HEAD (post-merge delta).
+      #    On schedule/dispatch: no base SHA, so every check runs unscoped.
       #    fetch-depth: 0 above ensures both refs are available in the local clone.
       # -----------------------------------------------------------------------
       - name: Compute base sha for path scoping
@@ -850,8 +854,8 @@ jobs:
             }
 
       # -----------------------------------------------------------------------
-      # Save caches (main only: a push to main, the weekly schedule or a manual
-      # dispatch on main).
+      # Save caches (main only: the weekly schedule or a manual dispatch on
+      # main).
       #
       # PRs restore and never save. A PR-saved cache lands under
       # refs/pull/N/merge, which no other PR can read, and tarring the Bun
