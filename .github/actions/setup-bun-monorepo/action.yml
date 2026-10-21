@@ -58,7 +58,13 @@ runs:
       shell: bash
       run: |
         CACHE_DIR="$HOME/.bun/install/cache"
-        ENTRIES=$(ls -A "$CACHE_DIR" 2>/dev/null | wc -l)
+        # A missing directory is a fresh runner, not an error: under the
+        # step shell's pipefail, a failing ls would end the whole setup.
+        if [ -d "$CACHE_DIR" ]; then
+          ENTRIES=$(ls -A "$CACHE_DIR" | wc -l)
+        else
+          ENTRIES=0
+        fi
         echo "local Bun cache: $ENTRIES entries in $CACHE_DIR"
         if [ "$ENTRIES" -gt 0 ]; then
           echo "present=true" >> "$GITHUB_OUTPUT"
