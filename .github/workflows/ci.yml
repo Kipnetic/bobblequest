@@ -34,26 +34,19 @@ env:
   FORCE_FULL_CI: ${{ github.event.inputs.force_e2e == 'true' }}
 
 jobs:
-  verify:
-    name: verify
+  # -------------------------------------------------------------------------
+  # Three work jobs run in parallel, then the gate (the ruleset's required
+  # check) joins them. The self-hosted runner has two containers, so at most
+  # two run at once: `test` is listed first so it takes a container straight
+  # away (it is the long pole), and `checks` then `build` share the other.
+  # Every job keeps the same turbo path scoping (Kipnetic/apex-hub#368).
+  # -------------------------------------------------------------------------
+  test:
+    name: test
+    # Test & coverage, plus doctor off PR. Needs the test Postgres and Redis.
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-
+    timeout-minutes: 45
     services:
-      # Used by: drizzle-check step
-      postgres-drizzle:
-        image: pgvector/pgvector:pg17
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_DB: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
 
       # Used by: test step
       postgres-test:
@@ -86,26 +79,27 @@ jobs:
 
     steps:
       # -----------------------------------------------------------------------
-      # 1. Checkout
+      # Checkout
       # -----------------------------------------------------------------------
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
       # -----------------------------------------------------------------------
-      # 2. Setup — Bun + caches (once for the entire job)
+      # Setup — Bun + caches (restore only)
       # -----------------------------------------------------------------------
       - uses: ./.github/actions/setup-bun-monorepo
         id: setup
         with:
           turbo-cache: 'true'
+          turbo-cache-scope: test
 
       - name: Install dependencies
         id: install
         run: bun install --frozen-lockfile
 
       # -----------------------------------------------------------------------
-      # 3. Compute base SHA for path scoping (PR diff vs merge base)
+      # Compute base SHA for path scoping (PR diff vs merge base)
       #    On pull_request: base.sha is the merge-base of the PR's target branch.
       #    On schedule/dispatch: no base SHA, so every check runs unscoped.
       #    fetch-depth: 0 above ensures both refs are available in the local clone.
@@ -128,8 +122,186 @@ jobs:
             echo "filter=" >> "$GITHUB_OUTPUT"
           fi
 
+      # Which container ran this job, and what it had. Two jobs share one
+      # Hetzner box (two Incus containers), so this is how to read contention.
+      - name: Runner info
+        run: echo "host=$(hostname) cpus=$(nproc) mem=$(free -g | awk '/Mem:/{print $2}')G load=$(cut -d' ' -f1-3 /proc/loadavg)"
+
       # -----------------------------------------------------------------------
-      # 4. Initialize CI report (PRs only — if: always() so it runs before
+      # Test & coverage
+      # -----------------------------------------------------------------------
+      # test:integration runs the api integration project and the db / cache
+      # live suites against the postgres-test and redis services below; with
+      # CI=true those suites fail (not skip) when a service is unreachable.
+      - name: Test & coverage
+        id: test
+        run: |
+          if [[ "${FORCE_FULL_CI}" == "true" ]]; then
+            bunx turbo run test:coverage
+            bunx turbo run test:integration
+          else
+            bunx turbo run test:coverage ${{ steps.filter.outputs.filter }}
+            bunx turbo run test:integration ${{ steps.filter.outputs.filter }}
+          fi
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5434/template_test
+          REDIS_URL: redis://localhost:6380
+
+      - name: Record test
+        if: always()
+        run: |
+          case "${{ steps.test.outcome }}" in
+            success)   STATUS="pass" ;;
+            failure)   STATUS="fail" ;;
+            cancelled) STATUS="cancelled" ;;
+            skipped)   STATUS="cancelled" ;;
+            *)         STATUS="cancelled" ;;
+          esac
+          echo "{\"name\":\"Test & coverage\",\"status\":\"$STATUS\"}" >> "$RUNNER_TEMP/ci-status.jsonl"
+
+      - name: Upload coverage & junit artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            **/coverage/**
+            **/junit.xml
+          retention-days: 7
+
+      # -----------------------------------------------------------------------
+      # Doctor
+      # -----------------------------------------------------------------------
+      # Not on pull_request. doctor --fast runs `turbo run typecheck`, `check`
+      # and `test:coverage` across the WHOLE repo with no filter, so on a
+      # scoped PR it repeats every package the scoped Typecheck, Lint and
+      # Test steps already ruled out (724-895s on apex-hub site-only PRs).
+      # It still runs on main (weekly schedule and dispatch), here in the
+      # test job: phase 4 runs `turbo run test:coverage`, which needs the
+      # test Postgres and Redis and hits the cache the Test step filled.
+      - name: Doctor
+        id: doctor
+        if: github.event_name != 'pull_request'
+        run: bun run doctor --ci --fast
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5434/template_test
+          REDIS_URL: redis://localhost:6380
+
+      - name: Record doctor
+        if: always()
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # Intentional skip on PRs, see the Doctor step
+            STATUS="skipped"
+          else
+            case "${{ steps.doctor.outcome }}" in
+              success)   STATUS="pass" ;;
+              failure)   STATUS="fail" ;;
+              *)         STATUS="cancelled" ;;
+            esac
+          fi
+          echo "{\"name\":\"Doctor\",\"status\":\"$STATUS\"}" >> "$RUNNER_TEMP/ci-status.jsonl"
+
+      # -----------------------------------------------------------------------
+      # Hand this job's per-step results to the gate, which builds the report.
+      # -----------------------------------------------------------------------
+      - name: Upload step results
+        if: always()
+        run: |
+          touch "$RUNNER_TEMP/ci-status.jsonl"
+          mkdir -p "$RUNNER_TEMP/ci-status-out"
+          cp "$RUNNER_TEMP/ci-status.jsonl" "$RUNNER_TEMP/ci-status-out/test.jsonl"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-status-test
+          path: ${{ runner.temp }}/ci-status-out/test.jsonl
+          retention-days: 3
+
+      # Main only (the weekly schedule or a manual dispatch). A PR-saved cache
+      # is readable by that PR alone (Kipnetic/apex-hub#336). always(): a red
+      # check later in the job does not make the cached files any less valid.
+      - name: Save Turbo task cache
+        if: always() && steps.install.outcome == 'success' && github.ref == 'refs/heads/main' && steps.setup.outputs.turbo-cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .turbo
+          key: ${{ steps.setup.outputs.turbo-cache-key }}
+
+  checks:
+    name: checks
+    # Lint, format, audit, markdown, links, typecheck, drizzle.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      # Used by: drizzle-check step
+      postgres-drizzle:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      # -----------------------------------------------------------------------
+      # Checkout
+      # -----------------------------------------------------------------------
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      # -----------------------------------------------------------------------
+      # Setup — Bun + caches (restore only)
+      # -----------------------------------------------------------------------
+      - uses: ./.github/actions/setup-bun-monorepo
+        id: setup
+        with:
+          turbo-cache: 'true'
+          turbo-cache-scope: checks
+
+      - name: Install dependencies
+        id: install
+        run: bun install --frozen-lockfile
+
+      # -----------------------------------------------------------------------
+      # Compute base SHA for path scoping (PR diff vs merge base)
+      #    On pull_request: base.sha is the merge-base of the PR's target branch.
+      #    On schedule/dispatch: no base SHA, so every check runs unscoped.
+      #    fetch-depth: 0 above ensures both refs are available in the local clone.
+      # -----------------------------------------------------------------------
+      - name: Compute base sha for path scoping
+        id: base
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "base_sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "base_sha=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute turbo filter
+        id: filter
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "filter=--filter=...[${{ steps.base.outputs.base_sha }}]" >> "$GITHUB_OUTPUT"
+          else
+            echo "filter=" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Which container ran this job, and what it had. Two jobs share one
+      # Hetzner box (two Incus containers), so this is how to read contention.
+      - name: Runner info
+        run: echo "host=$(hostname) cpus=$(nproc) mem=$(free -g | awk '/Mem:/{print $2}')G load=$(cut -d' ' -f1-3 /proc/loadavg)"
+
+      # -----------------------------------------------------------------------
+      # Initialize CI report (PRs only — if: always() so it runs before
       #    any potential failure in subsequent steps)
       # -----------------------------------------------------------------------
       - name: Initialize CI report
@@ -196,7 +368,7 @@ jobs:
             core.info(`Created CI Gate report comment on PR #${prNumber}`);
 
       # -----------------------------------------------------------------------
-      # 5. Commit message lint (PRs only)
+      # Commit message lint (PRs only)
       # -----------------------------------------------------------------------
       - name: Commit message lint
         id: commitlint
@@ -217,7 +389,7 @@ jobs:
           echo "{\"name\":\"Commit message lint\",\"status\":\"$STATUS\"}" >> "$RUNNER_TEMP/ci-status.jsonl"
 
       # -----------------------------------------------------------------------
-      # 6. PR title lint (PRs only — title becomes squash-merge commit message)
+      # PR title lint (PRs only — title becomes squash-merge commit message)
       # -----------------------------------------------------------------------
       - name: PR title lint
         id: pr-title-lint
@@ -256,7 +428,7 @@ jobs:
           echo "{\"name\":\"PR title lint\",\"status\":\"$STATUS\"}" >> "$RUNNER_TEMP/ci-status.jsonl"
 
       # -----------------------------------------------------------------------
-      # 7. Format check
+      # Format check
       # -----------------------------------------------------------------------
       - name: Format check
         id: format-check
@@ -275,7 +447,7 @@ jobs:
           echo "{\"name\":\"Format check\",\"status\":\"$STATUS\"}" >> "$RUNNER_TEMP/ci-status.jsonl"
 
       # -----------------------------------------------------------------------
-      # 7. Lint
+      # Lint
       # -----------------------------------------------------------------------
       - name: Lint
         id: lint
@@ -299,7 +471,7 @@ jobs:
           echo "{\"name\":\"Lint\",\"status\":\"$STATUS\"}" >> "$RUNNER_TEMP/ci-status.jsonl"
 
       # -----------------------------------------------------------------------
-      # 8. Dependency audit
+      # Dependency audit
       # -----------------------------------------------------------------------
       # Residual-advisory gate with time-boxed exceptions; see
       # docs/security/dependency-audit-policy.md
@@ -322,7 +494,7 @@ jobs:
           echo "{\"name\":\"Dependency audit\",\"status\":\"$STATUS\"}" >> "$RUNNER_TEMP/ci-status.jsonl"
 
       # -----------------------------------------------------------------------
-      # 9. Markdown lint
+      # Markdown lint
       # -----------------------------------------------------------------------
       - name: Get changed markdown files
         id: md-changed
@@ -364,7 +536,7 @@ jobs:
           echo "{\"name\":\"Markdown lint\",\"status\":\"$STATUS\"}" >> "$RUNNER_TEMP/ci-status.jsonl"
 
       # -----------------------------------------------------------------------
-      # 10. Link check (PRs and workflow_dispatch only, markdown changes only)
+      # Link check (PRs and workflow_dispatch only, markdown changes only)
       # -----------------------------------------------------------------------
       - name: Check if markdown files changed
         id: link-check-gate
@@ -431,7 +603,7 @@ jobs:
           echo "{\"name\":\"Link check\",\"status\":\"$STATUS\"}" >> "$RUNNER_TEMP/ci-status.jsonl"
 
       # -----------------------------------------------------------------------
-      # 11. Typecheck — turbo fans out to all apps in parallel inside the runner
+      # Typecheck — turbo fans out to all apps in parallel inside the runner
       # -----------------------------------------------------------------------
       - name: Typecheck
         id: typecheck
@@ -455,7 +627,7 @@ jobs:
           echo "{\"name\":\"Typecheck\",\"status\":\"$STATUS\"}" >> "$RUNNER_TEMP/ci-status.jsonl"
 
       # -----------------------------------------------------------------------
-      # 12. Drizzle migrations in sync
+      # Drizzle migrations in sync
       # -----------------------------------------------------------------------
       - name: Drizzle migrations in sync
         id: drizzle-check
@@ -477,49 +649,97 @@ jobs:
           echo "{\"name\":\"Drizzle migrations in sync\",\"status\":\"$STATUS\"}" >> "$RUNNER_TEMP/ci-status.jsonl"
 
       # -----------------------------------------------------------------------
-      # 13. Test & coverage
+      # Hand this job's per-step results to the gate, which builds the report.
       # -----------------------------------------------------------------------
-      # test:integration runs the api integration project and the db / cache
-      # live suites against the postgres-test and redis services below; with
-      # CI=true those suites fail (not skip) when a service is unreachable.
-      - name: Test & coverage
-        id: test
-        run: |
-          if [[ "${FORCE_FULL_CI}" == "true" ]]; then
-            bunx turbo run test:coverage
-            bunx turbo run test:integration
-          else
-            bunx turbo run test:coverage ${{ steps.filter.outputs.filter }}
-            bunx turbo run test:integration ${{ steps.filter.outputs.filter }}
-          fi
-        env:
-          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5434/template_test
-          REDIS_URL: redis://localhost:6380
-
-      - name: Record test
+      - name: Upload step results
         if: always()
         run: |
-          case "${{ steps.test.outcome }}" in
-            success)   STATUS="pass" ;;
-            failure)   STATUS="fail" ;;
-            cancelled) STATUS="cancelled" ;;
-            skipped)   STATUS="cancelled" ;;
-            *)         STATUS="cancelled" ;;
-          esac
-          echo "{\"name\":\"Test & coverage\",\"status\":\"$STATUS\"}" >> "$RUNNER_TEMP/ci-status.jsonl"
+          touch "$RUNNER_TEMP/ci-status.jsonl"
+          mkdir -p "$RUNNER_TEMP/ci-status-out"
+          cp "$RUNNER_TEMP/ci-status.jsonl" "$RUNNER_TEMP/ci-status-out/checks.jsonl"
 
-      - name: Upload coverage & junit artifacts
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
-          path: |
-            **/coverage/**
-            **/junit.xml
-          retention-days: 7
+          name: ci-status-checks
+          path: ${{ runner.temp }}/ci-status-out/checks.jsonl
+          retention-days: 3
+
+      # Main only (the weekly schedule or a manual dispatch). A PR-saved cache
+      # is readable by that PR alone (Kipnetic/apex-hub#336). always(): a red
+      # check later in the job does not make the cached files any less valid.
+      - name: Save Bun install cache
+        if: always() && steps.install.outcome == 'success' && github.ref == 'refs/heads/main' && steps.setup.outputs.bun-cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.setup.outputs.bun-cache-key }}
+
+      - name: Save Turbo task cache
+        if: always() && steps.install.outcome == 'success' && github.ref == 'refs/heads/main' && steps.setup.outputs.turbo-cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .turbo
+          key: ${{ steps.setup.outputs.turbo-cache-key }}
+
+  build:
+    name: build
+    # Build, bundle size budgets and E2E.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      # -----------------------------------------------------------------------
+      # Checkout
+      # -----------------------------------------------------------------------
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
       # -----------------------------------------------------------------------
-      # 14. Build
+      # Setup — Bun + caches (restore only)
+      # -----------------------------------------------------------------------
+      - uses: ./.github/actions/setup-bun-monorepo
+        id: setup
+        with:
+          turbo-cache: 'true'
+          turbo-cache-scope: build
+
+      - name: Install dependencies
+        id: install
+        run: bun install --frozen-lockfile
+
+      # -----------------------------------------------------------------------
+      # Compute base SHA for path scoping (PR diff vs merge base)
+      #    On pull_request: base.sha is the merge-base of the PR's target branch.
+      #    On schedule/dispatch: no base SHA, so every check runs unscoped.
+      #    fetch-depth: 0 above ensures both refs are available in the local clone.
+      # -----------------------------------------------------------------------
+      - name: Compute base sha for path scoping
+        id: base
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "base_sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "base_sha=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute turbo filter
+        id: filter
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "filter=--filter=...[${{ steps.base.outputs.base_sha }}]" >> "$GITHUB_OUTPUT"
+          else
+            echo "filter=" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Which container ran this job, and what it had. Two jobs share one
+      # Hetzner box (two Incus containers), so this is how to read contention.
+      - name: Runner info
+        run: echo "host=$(hostname) cpus=$(nproc) mem=$(free -g | awk '/Mem:/{print $2}')G load=$(cut -d' ' -f1-3 /proc/loadavg)"
+
+      # -----------------------------------------------------------------------
+      # Build
       # -----------------------------------------------------------------------
       - name: Build
         id: build
@@ -560,7 +780,7 @@ jobs:
           if-no-files-found: warn
 
       # -----------------------------------------------------------------------
-      # 15. Bundle size budget
+      # Bundle size budget
       # -----------------------------------------------------------------------
       - name: Determine if bundle size check applies
         id: size-limit-gate
@@ -607,26 +827,7 @@ jobs:
           echo "{\"name\":\"Bundle size budget\",\"status\":\"$STATUS\"}" >> "$RUNNER_TEMP/ci-status.jsonl"
 
       # -----------------------------------------------------------------------
-      # 16. Doctor
-      # -----------------------------------------------------------------------
-      - name: Doctor
-        id: doctor
-        run: bun run doctor --ci --fast
-
-      - name: Record doctor
-        if: always()
-        run: |
-          case "${{ steps.doctor.outcome }}" in
-            success)   STATUS="pass" ;;
-            failure)   STATUS="fail" ;;
-            cancelled) STATUS="cancelled" ;;
-            skipped)   STATUS="cancelled" ;;
-            *)         STATUS="cancelled" ;;
-          esac
-          echo "{\"name\":\"Doctor\",\"status\":\"$STATUS\"}" >> "$RUNNER_TEMP/ci-status.jsonl"
-
-      # -----------------------------------------------------------------------
-      # 17. E2E tests
+      # E2E tests
       # -----------------------------------------------------------------------
       - name: Determine if E2E applies
         id: e2e-gate
@@ -701,10 +902,55 @@ jobs:
           echo "{\"name\":\"E2E tests\",\"status\":\"$STATUS\"}" >> "$RUNNER_TEMP/ci-status.jsonl"
 
       # -----------------------------------------------------------------------
-      # 18. Final sticky comment — full per-step status table (if: always())
+      # Hand this job's per-step results to the gate, which builds the report.
+      # -----------------------------------------------------------------------
+      - name: Upload step results
+        if: always()
+        run: |
+          touch "$RUNNER_TEMP/ci-status.jsonl"
+          mkdir -p "$RUNNER_TEMP/ci-status-out"
+          cp "$RUNNER_TEMP/ci-status.jsonl" "$RUNNER_TEMP/ci-status-out/build.jsonl"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-status-build
+          path: ${{ runner.temp }}/ci-status-out/build.jsonl
+          retention-days: 3
+
+      # Main only (the weekly schedule or a manual dispatch). A PR-saved cache
+      # is readable by that PR alone (Kipnetic/apex-hub#336). always(): a red
+      # check later in the job does not make the cached files any less valid.
+      - name: Save Turbo task cache
+        if: always() && steps.install.outcome == 'success' && github.ref == 'refs/heads/main' && steps.setup.outputs.turbo-cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .turbo
+          key: ${{ steps.setup.outputs.turbo-cache-key }}
+
+  # The ruleset's required check. Its name must stay exactly `verify`.
+  verify:
+    name: verify
+    needs: [test, checks, build]
+    # always(): run even when a work job failed, so the gate reports red
+    # instead of being skipped (a skipped required check counts as passing).
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ci-status-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/ci-status
+
+      # -----------------------------------------------------------------------
+      # Final sticky comment — full per-step status table (if: always())
       #
-      # Each step has a dedicated "if: always()" recorder that writes its
-      # outcome to ci-status.jsonl:
+      # Each step in the work jobs has a dedicated "if: always()" recorder
+      # that writes its outcome to that job's ci-status.jsonl, uploaded as the
+      # ci-status-<job> artifact and merged here:
       #   success  -> "pass"
       #   failure  -> "fail"
       #   skipped  -> "cancelled"  (cascade-skip caused by an upstream failure)
@@ -730,7 +976,7 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            const statusFile = path.join(process.env.RUNNER_TEMP, 'ci-status.jsonl');
+            const statusDir = path.join(process.env.RUNNER_TEMP, 'ci-status');
 
             // Checks that are only expected on PR events (not push:main)
             // When run is a push, these are absent from JSONL legitimately.
@@ -744,7 +990,10 @@ jobs:
 
             // Parse the JSONL status file — last write wins; fail always overrides
             const recorded = {};
-            if (fs.existsSync(statusFile)) {
+            const statusFiles = fs.existsSync(statusDir)
+              ? fs.readdirSync(statusDir).filter(f => f.endsWith('.jsonl')).map(f => path.join(statusDir, f))
+              : [];
+            for (const statusFile of statusFiles) {
               const lines = fs.readFileSync(statusFile, 'utf8').trim().split('\n').filter(Boolean);
               for (const line of lines) {
                 try {
@@ -853,27 +1102,13 @@ jobs:
               core.info(`Created CI Gate report on PR #${prNumber}`);
             }
 
-      # -----------------------------------------------------------------------
-      # Save caches (main only: the weekly schedule or a manual dispatch on
-      # main).
-      #
-      # PRs restore and never save. A PR-saved cache lands under
-      # refs/pull/N/merge, which no other PR can read, and tarring the Bun
-      # cache cost apex-hub 490s per PR run. Caches saved from main are
-      # readable by every PR, so main is the only place a save pays for itself.
-      # always(): a red check later in the run does not make the downloaded
-      # packages or turbo's passed-task entries any less valid.
-      # -----------------------------------------------------------------------
-      - name: Save Bun install cache
-        if: always() && steps.install.outcome == 'success' && github.ref == 'refs/heads/main' && steps.setup.outputs.bun-cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ steps.setup.outputs.bun-cache-key }}
-
-      - name: Save Turbo task cache
-        if: always() && steps.install.outcome == 'success' && github.ref == 'refs/heads/main' && steps.setup.outputs.turbo-cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: .turbo
-          key: ${{ steps.setup.outputs.turbo-cache-key }}
+      # A job that died before its recorders ran (setup failure, timeout,
+      # runner lost) leaves no "fail" line, so judge the jobs themselves too.
+      - name: Fail unless every job passed
+        env:
+          RESULTS: test=${{ needs.test.result }} checks=${{ needs.checks.result }} build=${{ needs.build.result }}
+        run: |
+          echo "$RESULTS"
+          for r in $RESULTS; do
+            [[ "${r#*=}" == "success" ]] || { echo "::error::job ${r%%=*} ended ${r#*=}"; exit 1; }
+          done

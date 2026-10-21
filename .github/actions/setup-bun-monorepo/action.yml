@@ -13,6 +13,12 @@ inputs:
     description: 'Restore the .turbo task cache in addition to the Bun install cache.'
     required: false
     default: 'false'
+  turbo-cache-scope:
+    description: >
+      Namespace for the Turbo cache key. Each CI job runs different tasks, so
+      each keeps its own .turbo cache instead of overwriting one shared entry.
+    required: false
+    default: 'shared'
 
 # Restore only. A composite action has no post step of its own, so saving is
 # the consuming job's job (see the "Save ... cache" steps at the end of
@@ -41,10 +47,36 @@ runs:
       with:
         bun-version: 1.4.2
 
+    # The self-hosted runner's containers are reused between jobs, so the Bun
+    # cache from the last job is usually still on disk. Downloading the saved
+    # copy over it cost apex-hub 2-8 minutes per job. When a local cache
+    # exists, only look the saved key up (so a main run still knows whether to
+    # save) and let bun fetch whatever is missing. A fresh VM
+    # (CI_RUNNER=ubuntu-latest) has no local cache and restores as before.
+    - name: Check for a local Bun cache
+      id: local-bun
+      shell: bash
+      run: |
+        CACHE_DIR="$HOME/.bun/install/cache"
+        # A missing directory is a fresh runner, not an error: under the
+        # step shell's pipefail, a failing ls would end the whole setup.
+        if [ -d "$CACHE_DIR" ]; then
+          ENTRIES=$(ls -A "$CACHE_DIR" | wc -l)
+        else
+          ENTRIES=0
+        fi
+        echo "local Bun cache: $ENTRIES entries in $CACHE_DIR"
+        if [ "$ENTRIES" -gt 0 ]; then
+          echo "present=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "present=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Restore Bun install cache
       id: bun-cache
       uses: actions/cache/restore@v4
       with:
+        lookup-only: ${{ steps.local-bun.outputs.present == 'true' }}
         path: ~/.bun/install/cache
         key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', '.github/workflows/ci.yml', 'turbo.json') }}
         restore-keys: bun-${{ runner.os }}-
@@ -55,5 +87,5 @@ runs:
       uses: actions/cache/restore@v4
       with:
         path: .turbo
-        key: turbo-${{ runner.os }}-${{ hashFiles('bun.lock', '.github/workflows/ci.yml', 'turbo.json') }}
-        restore-keys: turbo-${{ runner.os }}-
+        key: turbo-${{ inputs.turbo-cache-scope }}-${{ runner.os }}-${{ hashFiles('bun.lock', '.github/workflows/ci.yml', 'turbo.json') }}
+        restore-keys: turbo-${{ inputs.turbo-cache-scope }}-${{ runner.os }}-
