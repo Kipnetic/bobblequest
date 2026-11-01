@@ -35,7 +35,7 @@
         "@trpc/server": "^11.0.0",
         "hono": "^4.12.16",
         "svix": "^1.92.2",
-        "zod": "^3.23.0",
+        "zod": "^4.0.0",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.4.13",
@@ -252,7 +252,7 @@
         "@t/dependency-injection": "workspace:*",
         "@t/logging": "workspace:*",
         "posthog-node": "^4.0.0",
-        "zod": "^3.23.0",
+        "zod": "^4.0.0",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.4.13",
@@ -342,7 +342,7 @@
       "name": "@t/analytics-types",
       "version": "0.0.0",
       "dependencies": {
-        "zod": "^3.23.0",
+        "zod": "^4.0.0",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.4.13",
@@ -360,7 +360,7 @@
         "@t/config": "workspace:*",
         "@t/dependency-injection": "workspace:*",
         "@t/logging": "workspace:*",
-        "zod": "^3.23.0",
+        "zod": "^4.0.0",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.4.13",
@@ -381,7 +381,7 @@
         "@t/dependency-injection": "workspace:*",
         "@t/logging": "workspace:*",
         "stripe": "^19.1.0",
-        "zod": "^3.23.0",
+        "zod": "^4.0.0",
       },
       "devDependencies": {
         "@types/node": "^25.6.0",
@@ -426,7 +426,7 @@
         "@t/config": "workspace:*",
         "@t/dependency-injection": "workspace:*",
         "ioredis": "^5.4.0",
-        "zod": "^3.23.0",
+        "zod": "^4.0.0",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.4.13",
@@ -444,7 +444,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@t/dependency-injection": "workspace:*",
-        "zod": "^3.23.0",
+        "zod": "^4.0.0",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.4.13",
@@ -463,7 +463,7 @@
         "@t/logging": "workspace:*",
         "drizzle-orm": "^0.45.0",
         "postgres": "^3.4.0",
-        "zod": "^3.23.0",
+        "zod": "^4.0.0",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.4.13",
@@ -497,7 +497,7 @@
       "dependencies": {
         "@t/logging": "workspace:*",
         "hono": "^4.0.0",
-        "zod": "^3.23.0",
+        "zod": "^4.0.0",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.4.13",
@@ -522,7 +522,7 @@
         "@t/logging-types": "workspace:*",
         "winston": "^3.19.0",
         "winston-transport": "^4.9.0",
-        "zod": "^3.23.0",
+        "zod": "^4.0.0",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.4.13",
@@ -539,7 +539,7 @@
         "@t/analytics-types": "workspace:*",
         "@t/dependency-injection": "workspace:*",
         "@t/logging-types": "workspace:*",
-        "zod": "^3.23.0",
+        "zod": "^4.0.0",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.4.13",
@@ -557,7 +557,7 @@
         "@t/analytics-types": "workspace:*",
         "@t/dependency-injection": "workspace:*",
         "@t/logging-types": "workspace:*",
-        "zod": "^3.23.0",
+        "zod": "^4.0.0",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.4.13",
@@ -3732,7 +3732,7 @@
 
     "yocto-queue": ["yocto-queue@0.1.0", "", {}, "sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q=="],
 
-    "zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
+    "zod": ["zod@4.6.5", "", {}, "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q=="],
 
     "zustand": ["zustand@5.0.3", "", { "peerDependencies": { "@types/react": ">=18.0.0", "immer": ">=9.0.6", "react": ">=18.0.0", "use-sync-external-store": ">=1.2.0" }, "optionalPeers": ["@types/react", "immer", "react", "use-sync-external-store"] }, "sha512-14fwWQtU3pH4dE0dOpdMiWjddcH+QzKIgk1cl8epwSE7yag43k/AD/m4L6+K7DytAOr9gGBe3/EXj9g7cdostg=="],
 
@@ -4163,8 +4163,6 @@
     "@t/website/jsdom": ["jsdom@26.1.0", "", { "dependencies": { "cssstyle": "^4.2.1", "data-urls": "^5.0.0", "decimal.js": "^10.5.0", "html-encoding-sniffer": "^4.0.0", "http-proxy-agent": "^7.0.2", "https-proxy-agent": "^7.0.6", "is-potential-custom-element-name": "^1.0.1", "nwsapi": "^2.2.16", "parse5": "^7.2.1", "rrweb-cssom": "^0.8.0", "saxes": "^6.0.0", "symbol-tree": "^3.2.4", "tough-cookie": "^5.1.1", "w3c-xmlserializer": "^5.0.0", "webidl-conversions": "^7.0.0", "whatwg-encoding": "^3.1.1", "whatwg-mimetype": "^4.0.0", "whatwg-url": "^14.1.1", "ws": "^8.18.0", "xml-name-validator": "^5.0.0" }, "peerDependencies": { "canvas": "^3.0.0" }, "optionalPeers": ["canvas"] }, "sha512-Cvc9WUhxSMEo4McES3P7oK3QaXldCfNWp7pl2NNeiIFlCoLr3kfq9kb1fxftiwk1FLV7CvpvDfonxtzUDeSOPg=="],
 
     "@t/website/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
-
-    "@t/website/zod": ["zod@4.6.5", "", {}, "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q=="],
 
     "@tailwindcss/node/jiti": ["jiti@2.7.0", "", { "bin": { "jiti": "lib/jiti-cli.mjs" } }, "sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ=="],
 
