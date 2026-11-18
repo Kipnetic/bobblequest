@@ -38,7 +38,7 @@
     "@t/logging": "workspace:*",
     "@t/queue": "workspace:*",
     "@trpc/server": "^11.0.0",
-    "hono": "^4.12.16",
+    "hono": "^4.13.18",
     "svix": "^1.92.2",
     "zod": "^3.23.0"
   },

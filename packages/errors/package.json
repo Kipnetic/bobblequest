@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@t/logging": "workspace:*",
-    "hono": "^4.0.0",
+    "hono": "^4.13.18",
     "zod": "^3.23.0"
   },
   "devDependencies": {
