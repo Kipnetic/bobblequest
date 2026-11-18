@@ -23,7 +23,7 @@
     "@t/config": "workspace:*",
     "@t/dependency-injection": "workspace:*",
     "@t/logging": "workspace:*",
-    "zod": "^3.23.0"
+    "zod": "^4.0.0"
   },
   "peerDependencies": {
     "awilix": "^12.0.0"
